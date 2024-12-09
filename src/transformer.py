@@ -74,5 +74,5 @@ if __name__ == "__main__":
         device_map="auto", torch_dtype="float16", quantization_config=bnb_config
     )
     transformer: HuggingFaceTransformer = HuggingFaceTransformer(
-        base_model_name=base_model_name, config=config, categories=[""]
+        base_model_name=base_model_name, config=config, categories=["random", "food"]
     )
