@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Literal, Optional
+from typing import Literal, Optional, Any
 
 from pydantic import BaseModel
-from transformers import BitsAndBytesConfig
+from transformers import BitsAndBytesConfig, PreTrainedModel, PreTrainedTokenizer
 
 """
 ClassificationLoader(ABC):
@@ -36,6 +36,21 @@ class BaseLoader(ABC):
     def preprocess(self, *args, **kwargs) -> bool:
         pass
 
+    @property
+    @abstractmethod
+    def train_data(self) -> Any:
+        raise NotImplementedError("Abstract method")
+
+    @property
+    @abstractmethod
+    def test_data(self) -> Any:
+        raise NotImplementedError("Abstract method")
+
+    @property
+    @abstractmethod
+    def validation_data(self) -> Any:
+        raise NotImplementedError("Abstract method")
+
 
 class BaseInjector(ABC):
     # The injector will be resposible for creating synthetic private data and injecting it in the dataset we are using
@@ -50,12 +65,34 @@ class TransformerConfig(BaseModel):
 
 
 class BaseTransformer(ABC):
+    def __init__(self):
+        self.model: Optional[PreTrainedModel] = None
+        self.tokenizer: Optional[PreTrainedTokenizer] = None
+
+    def named_modules(self):
+        """Returns the names of all modules in the model used by Lora Training"""
+        return self.model.named_modules()
+
     pass
 
 
 class BaseTrainer(ABC):
-    #
-    pass
+    @abstractmethod
+    @property
+    def modules(self) -> list[Any]:
+        raise NotImplementedError("Abstract method")
+
+    @abstractmethod
+    def load(self, *args, **kwargs) -> bool:
+        raise NotImplementedError("Abstract method")
+
+    @abstractmethod
+    def train(self, *args, **kwargs) -> Any:
+        raise NotImplementedError("Abstract method")
+
+    @abstractmethod
+    def save(self, output_dir: str, *args, **kwargs) -> bool:
+        raise NotImplementedError("Abstract method")
 
 
 class BaseBenchmarker(ABC):

@@ -2,9 +2,16 @@ from copy import deepcopy
 from typing import Any, Optional
 
 from loguru import logger
-from transformers import (AutoModelForCausalLM, AutoTokenizer,
-                          BitsAndBytesConfig, pipeline)
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    pipeline,
+    PreTrainedModel,
+    PreTrainedTokenizer,
+)
 
+from src.config import TransformerQConfig
 from src.models import BaseTransformer, TransformerConfig
 
 
@@ -18,27 +25,23 @@ class HuggingFaceTransformer(BaseTransformer):
             isinstance(category, str) for category in categories
         ), "Categories should be a list of strings"
 
-        self.model: Optional[Any] = None
-        self.tokenizer: Optional[Any] = None
+        super().__init__()
+        self.model: Optional[PreTrainedModel] = None
+        self.tokenizer: Optional[PreTrainedTokenizer] = None
+        self.pipe: Optional[pipeline] = None
         self.model_name: str = base_model_name
         self.config: TransformerConfig = config
         self.categories: list[str] = deepcopy(categories)
+
         assert self.load()
-        self.pipe: pipeline = pipeline(
-            task="text-generation",
-            model=self.model,
-            tokenizer=self.tokenizer,
-            max_new_tokens=40,
-            temperature=0.1,
-        )
 
     def load(self) -> bool:
         """Loading the pretrained model, tokenizer and other stuff"""
-        self.tokenizer: Optional[Any] = AutoTokenizer.from_pretrained(
+        self.tokenizer: Optional[PreTrainedTokenizer] = AutoTokenizer.from_pretrained(
             self.model_name
         )  # tokenizer for the model to finetune
         logger.info(self.config.model_dump())
-        self.model: Optional[Any] = AutoModelForCausalLM.from_pretrained(
+        self.model: Optional[PreTrainedModel] = AutoModelForCausalLM.from_pretrained(
             pretrained_model_name_or_path=self.model_name,
             quantization_config=self.config.quantization_config,
             device_map=self.config.device_map,
@@ -46,6 +49,15 @@ class HuggingFaceTransformer(BaseTransformer):
         )
         self.model.config.use_cache = False
         self.model.config.pretraining_tp = 1
+        self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
+
+        self.pipe: pipeline = pipeline(
+            task="text-generation",
+            model=self.model,
+            tokenizer=self.tokenizer,
+            max_new_tokens=40,
+            temperature=0.1,
+        )
         return True
 
     def predict(self, prompt: str) -> str:
@@ -70,7 +82,7 @@ if __name__ == "__main__":
         bnb_4bit_quant_type="nf4",
         bnb_4bit_compute_dtype="float16",
     )
-    config: TransformerConfig = TransformerConfig(
+    config: TransformerQConfig = TransformerQConfig(
         device_map="auto", torch_dtype="float16", quantization_config=bnb_config
     )
     transformer: HuggingFaceTransformer = HuggingFaceTransformer(
